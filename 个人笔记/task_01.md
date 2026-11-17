@@ -3,6 +3,33 @@
 
 特点是采用Pytrio进行远程训练，从而避免对配置的需求，也能专注算法本身，用Swanlab进行训练监控。
 
+**感谢DataWhale与Pytrio的支持。**
+
+以下是预实验：
+```python
+uv run python experiments/grpo/01-demo-sync.py --steps 10 --batch-size 4 --group-size 8 --max-tokens 512 --swanlab-mode online
+```
+
+![datums](./figures/datums.png)
+
+datums：当前训练步用于更新模型的样本数。
+
+![frac_degenerate](./figures/frac_degenerate.png)
+
+frac_degenerate：退化组占比，即同一道题的所有回答奖励相同、优势值全为零的组所占比例。
+
+![loss](./figures/loss.png)
+
+loss：训练损失。
+
+![reward](./figures/reward.png)
+
+reward：当前训练步生成回答的平均奖励。
+
+![train_tokens](./figures/train_tokens.png)
+
+train_tokens：当前训练步中优势值非零、实际参与训练的回答 token 数。
+
 ### Task01-Loss Function
 
 **Loss的简单思想：做得好的token，我们就增大他的概率，做得差的就减少他的概率**
