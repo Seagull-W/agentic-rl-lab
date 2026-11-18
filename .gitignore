@@ -264,3 +264,6 @@ experiments/general-opd/datasets/
 # Local agent instructions
 /AGENTS.md
 /AGENT.md
+
+# Local workspace artifacts
+/.workspace/
