@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vision GRPO 训练架构 · 从几何图到策略更新</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f6f4ee;
+      --surface: #fffefa;
+      --ink: #1b3534;
+      --muted: #506662;
+      --green: #126958;
+      --forest: #104c42;
+      --sage: #e5efe5;
+      --blue: #245877;
+      --ice: #e2eff4;
+      --gold: #81541c;
+      --sand: #f4e8d2;
+      --rule: #c2cfc3;
+      --mono: Consolas, "SFMono-Regular", "Microsoft YaHei", monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--ink); background: var(--paper);
+      font: 16px/1.55 "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    }
+    h1, h2, h3, p, figure { margin: 0; }
+    h1, h2, h3 { line-height: 1.3; }
+    code, .source, .equation, .choice, .value { font-family: var(--mono); }
+    code { font-size: .96em; overflow-wrap: anywhere; }
+    a { color: inherit; text-underline-offset: 3px; }
+    a:focus-visible { outline: 3px solid #c7862a; outline-offset: 3px; }
+    main { max-width: 1240px; margin: auto; padding: 32px 44px 30px; }
+    .mast { display: flex; justify-content: space-between; align-items: end; gap: 18px; padding-bottom: 15px; border-bottom: 2px solid var(--forest); }
+    h1 { font-size: clamp(32px, 4.2vw, 51px); letter-spacing: -.04em; }
+    .mast p { margin-top: 5px; font-size: 18px; color: var(--muted); }
+    .model { text-align: right; font-size: 14px; color: var(--muted); }
+    .model strong { display: block; color: var(--ink); font: 600 17px/1.5 var(--mono); }
+    .source { font-size: 13px; color: var(--muted); white-space: nowrap; text-decoration-color: #96aaa0; }
+    .flow { position: relative; }
+    .wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 2; }
+    .step-start { display: flex; gap: 14px; align-items: baseline; padding: 13px 0 12px; flex-wrap: wrap; }
+    .step-start b { color: var(--green); }
+    .step-start .source { margin-left: auto; }
+    .problem { display: grid; grid-template-columns: 168px 1fr minmax(185px, .42fr); background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; align-items: center; }
+    .problem figure {
+      align-self: stretch; display: grid; place-items: center; padding: 5px 8px;
+      background-color: #eaf0e7;
+      background-image: linear-gradient(#d9e6da 1px, transparent 1px), linear-gradient(90deg, #d9e6da 1px, transparent 1px);
+      background-size: 14px 14px;
+    }
+    .problem svg { width: 144px; height: 111px; display: block; }
+    .question { padding: 12px 20px; }
+    .key { color: var(--muted); font-size: 13px; }
+    .question h2 { font-size: 21px; margin: 3px 0; }
+    .choice { font-size: 16px; word-spacing: .2em; }
+    .gold { border-left: 1px dashed #d4c6a9; color: var(--gold); padding: 5px 15px 5px 20px; }
+    .gold strong, .gold small { display: block; }
+    .gold small { font-size: 14px; }
+    .drop { height: 24px; margin-left: 29px; width: 2px; background: #94ad9f; position: relative; }
+    .drop::after, .feed::after {
+      content: ""; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%);
+      border: 4px solid transparent; border-top: 6px solid #789687; border-bottom: 0;
+    }
+    .stage { border: 1px solid var(--rule); border-radius: 9px; background: var(--surface); }
+    .stage-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; }
+    .stage-head h2 { font-size: 25px; letter-spacing: -.035em; }
+    .context { border: 2px solid var(--forest); overflow: hidden; }
+    .context .stage-head { background: var(--forest); padding: 12px 19px; color: white; }
+    .context .source { color: #e0eee3; text-decoration-color: #95b2a3; }
+    .context-body { padding: 15px 19px 14px; }
+    .template { display: grid; grid-template-columns: auto 1fr; gap: 5px 16px; align-items: baseline; }
+    .template h3, .lane h3, .rollout h3, .outputs h3 { font-size: 18px; }
+    .template p { font-size: 15px; }
+    .template .settings { grid-column: 2; color: var(--muted); font-size: 14px; }
+    .split { margin-top: 13px; border-top: 1px solid var(--rule); padding-top: 9px; font-size: 14px; color: var(--muted); }
+    .assembly, .chunks { display: grid; grid-template-columns: 1fr 1.43fr 1fr; gap: 10px; }
+    .assembly { margin-top: 7px; }
+    .lane { display: flex; flex-direction: column; border: 1px solid #c3d6c7; background: #f3f7ef; border-radius: 5px; }
+    .lane-label { background: var(--sage); color: var(--forest); padding: 5px 12px; text-align: center; font: 600 16px/1.5 var(--mono); }
+    .lane-body { padding: 10px 13px 11px; font-size: 15px; }
+    .lane-body h3 { margin-bottom: 4px; }
+    .lane-body p + p { margin-top: 6px; }
+    .lane-body .detail { color: var(--muted); font-size: 14px; }
+    .pixel { border-color: #b2cdd7; background: #f1f7f9; }
+    .pixel .lane-label { color: var(--blue); background: var(--ice); }
+    .pixel h3 { color: var(--blue); }
+    .pixel .equation { color: #194e6c; font-size: 14px; }
+    .feeds { display: grid; grid-template-columns: 1fr 1.43fr 1fr; gap: 10px; }
+    .feed { height: 16px; width: 2px; background: #85a392; justify-self: center; position: relative; }
+    .feed.image-feed { background: #7fa6b7; }
+    .image-feed::after { border-top-color: #6b92a4; }
+    .chunks { gap: 2px; }
+    .chunk { padding: 8px 7px; text-align: center; background: #dceade; color: var(--forest); }
+    .chunk:first-child { border-radius: 5px 0 0 5px; }
+    .chunk:last-child { border-radius: 0 5px 5px 0; }
+    .chunk strong { display: block; font: 600 16px/1.45 var(--mono); }
+    .chunk span { font-size: 14px; }
+    .chunk.pixel-chunk { background: #cce2ec; color: #174c68; }
+    .bracket { height: 7px; border: solid #789687; border-width: 0 1px 1px; margin: 2px 3px 5px; }
+    .prompt-length { text-align: center; color: var(--forest); font-size: 15px; }
+    .prompt-length b { margin-right: .6em; }
+    .rollout, .datum { padding: 15px 19px; }
+    .roll-grid { display: grid; grid-template-columns: 1fr 1.13fr; gap: 26px; margin-top: 12px; align-items: start; }
+    .rollout h3 { margin-bottom: 4px; }
+    .rollout p, .gate, .datum p, .outputs p { font-size: 15px; }
+    .sample-notes { display: grid; gap: 7px; }
+    .check { border-left: 3px solid #7fa6b7; padding-left: 9px; color: var(--blue); }
+    table { border-collapse: collapse; }
+    .scores { width: 100%; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .scores caption { text-align: left; font-size: 14px; font-weight: bold; color: var(--gold); background: var(--sand); padding: 4px 9px; }
+    .scores td, .scores th { padding: 3px 7px; text-align: center; border-bottom: 1px solid #dbded1; }
+    .scores th { font-size: 13px; color: var(--muted); }
+    .scores th:first-child, .scores td:first-child { text-align: left; }
+    .value { color: var(--forest); font-weight: 600; }
+    .negative { color: #79533b; }
+    .gate { margin-top: 11px; padding-top: 9px; border-top: 1px dashed var(--rule); }
+    .gate b { color: var(--green); }
+    .datum p { margin: 6px 0 10px; }
+    .scroll { overflow-x: auto; }
+    .align { width: 100%; font-size: 15px; text-align: center; font-variant-numeric: tabular-nums; }
+    .align th, .align td { border-bottom: 1px solid #d5ded2; padding: 5px 9px; white-space: nowrap; }
+    .align thead { color: var(--muted); font-size: 13px; }
+    .align th:first-child { text-align: left; }
+    .align tbody th { font-family: var(--mono); font-weight: 500; }
+    .align .context-pos { background: #eaf0e6; }
+    .align .first { background: #d7e9eb; color: #164d60; border-left: 2px solid #709aa4; }
+    .align .answer-pos { background: #f6f0e4; }
+    .caption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+    .caption b { color: #164d60; }
+    .scroll-hint { display: none; }
+    .update { background: #e4ede2; border: 1px solid #b8cbbc; border-left: 5px solid var(--green); border-radius: 5px; padding: 11px 16px; }
+    .update h2 { font-size: 21px; }
+    .update p { font-size: 15px; margin-top: 3px; }
+    .outputs { margin-top: 15px; padding-top: 12px; border-top: 1px solid #9dab9d; display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+    .outputs h3 { display: inline; }
+    .outputs .source { margin-left: 8px; }
+    .outputs p { color: var(--muted); margin-top: 4px; }
+    .jump { text-decoration-style: dotted; font-weight: 600; }
+    @media (max-width: 960px) {
+      main { padding-left: 30px; padding-right: 30px; }
+      .roll-grid { gap: 15px; } .template { grid-template-columns: 1fr; } .template .settings { grid-column: 1; }
+    }
+    @media (max-width: 730px) {
+      main { padding: 18px 15px 24px; } .wires { display: none; }
+      .mast { align-items: start; flex-direction: column; gap: 5px; }
+      .model { text-align: left; } .model strong { display: inline; margin-right: 8px; font-size: 15px; }
+      .mast p { font-size: 16px; } .step-start { gap: 3px 8px; } .step-start .source { margin-left: 0; }
+      .problem { grid-template-columns: 100px minmax(0, 1fr); } .problem svg { width: 92px; height: 90px; }
+      .question { padding: 9px; } .question h2 { font-size: 17px; } .choice { font-size: 13px; word-spacing: normal; }
+      .gold { grid-column: 1 / -1; border: 0; border-top: 1px dashed #d4c6a9; padding: 4px 10px; }
+      .gold strong, .gold small { display: inline; } .gold small { margin-left: 6px; }
+      .stage-head { align-items: start; flex-direction: column; } .stage-head h2 { font-size: 21px; }
+      .context .stage-head, .context-body, .rollout, .datum { padding: 12px; }
+      .assembly { grid-template-columns: 1fr; } .lane { display: grid; grid-template-columns: 88px 1fr; }
+      .lane-label { display: flex; align-items: center; justify-content: center; font-size: 12px; overflow-wrap: anywhere; padding: 3px; }
+      .lane-body { padding: 7px 9px; } .lane-body h3 { font-size: 16px; }
+      .lane-body p, .template p { font-size: 14px; } .feeds { display: flex; justify-content: center; } .feeds .feed:not(.image-feed) { display: none; }
+      .chunks { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .chunk { padding: 5px 2px; } .chunk strong { font-size: 12px; overflow-wrap: anywhere; } .chunk span { font-size: 12px; overflow-wrap: anywhere; }
+      .prompt-length b { display: block; } .roll-grid, .outputs { grid-template-columns: 1fr; }
+      .outputs { gap: 12px; } .align th, .align td { padding: 5px 7px; } .drop { height: 17px; }
+      .scroll-hint { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header class="mast">
+    <div><h1>Vision GRPO 训练架构</h1><p>一张几何图如何进入上下文，又如何参与下一轮策略更新</p></div>
+    <div class="model"><strong>Qwen/Qwen3.5-4B</strong>GeoQA 选择题 · PyTRIO · 默认 LoRA rank 32</div>
+  </header>
+  <div class="flow" id="flow">
+    <svg class="wires" aria-hidden="true">
+      <defs>
+        <marker id="green-tip" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 7 3.5 0 7Z" fill="#608774"/></marker>
+        <marker id="gold-tip" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 7 3.5 0 7Z" fill="#a57b44"/></marker>
+        <marker id="blue-tip" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 7 3.5 0 7Z" fill="#618797"/></marker>
+      </defs>
+      <path id="return-wire" fill="none" stroke="#608774" stroke-width="1.6" marker-end="url(#green-tip)"/>
+      <path id="gold-wire" fill="none" stroke="#a57b44" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#gold-tip)"/>
+      <path id="reuse-wire" fill="none" stroke="#618797" stroke-width="1.5" stroke-dasharray="3 4" marker-end="url(#blue-tip)"/>
+    </svg>
+    <div class="step-start" id="sampler">
+      <b>每个训练步</b><span>从打乱的 <code>train.parquet</code> 取一批题，用当前 LoRA 权重建立本步共享的采样器。</span>
+      <a class="source" href="../../experiments/vision-grpo/train.py">train.py 325–359</a>
+    </div>
+    <section class="problem" aria-label="GeoQA 字段示例">
+      <figure>
+        <svg viewBox="0 0 200 154" role="img" aria-labelledby="triangle-title">
+          <title id="triangle-title">三角形示意图，A 角 50 度，B 角 60 度，C 角待求</title>
+          <path d="M24 130 170 130 110.6 26.8Z" fill="#fffef8" stroke="#295f51" stroke-width="2.3" stroke-linejoin="round"/>
+          <g fill="none" stroke="#678d80" stroke-width="1.4">
+            <path d="M46 130 A22 22 0 0 0 38.1 113.1"/><path d="M149 130 A21 21 0 0 1 159.5 111.8"/>
+            <path d="M99 40.6 Q109 50 119.6 42.4" stroke="#2b7391"/>
+          </g>
+          <g fill="#204c40" font-family="Consolas,monospace" font-size="15"><text x="12" y="145">A</text><text x="170" y="146">B</text><text x="109" y="21">C</text><text x="48" y="124">50°</text><text x="119" y="124">60°</text><text x="106" y="61" fill="#245877">?</text></g>
+        </svg>
+      </figure>
+      <div class="question">
+        <p class="key">按 GeoQA 字段构造的示例题</p>
+        <h2>如图，三角形 ABC 的 ∠C 等于多少？</h2>
+        <p class="choice">A. 50°　B. 60°　C. 70°　D. 80°</p>
+      </div>
+      <div class="gold" id="gold"><strong><code>label = 2 → C</code></strong><small>标准选项 → <a href="#grade">采样后评分</a></small></div>
+    </section>
+    <div class="drop" aria-hidden="true"></div>
+    <section class="stage context" id="context">
+      <header class="stage-head"><h2>将图片插入题目上下文</h2><a class="source" href="../../experiments/vision-grpo/train.py">train.py 125–194</a></header>
+      <div class="context-body">
+        <div class="template">
+          <h3>构造用户消息</h3>
+          <p><code>subject + choices</code> 写成题目、选项和作答要求，随后追加图片标记 <code>{"type": "image", "image": "geoqa"}</code>。</p>
+          <p class="settings"><code>apply_chat_template</code> 渲染字符串，开启 <code>add_generation_prompt</code>，设置 <code>enable_thinking=False</code>。</p>
+        </div>
+        <p class="split">在模板生成的 <code>&lt;|image_pad|&gt;</code> 处切开字符串，按下列顺序组装三个 chunk。</p>
+        <div class="assembly">
+          <div class="lane">
+            <div class="lane-label">before_image</div>
+            <div class="lane-body"><h3>编码前段文本</h3><p>保留占位符之前的模板文本，包括用户题目、四个选项和回答格式。</p><p class="detail"><code>tokenizer.encode(…, add_special_tokens=False)</code></p></div>
+          </div>
+          <div class="lane pixel">
+            <div class="lane-label">&lt;|image_pad|&gt;</div>
+            <div class="lane-body">
+              <h3>在此插入 <code>row["image"]</code> 的像素</h3>
+              <p>RGBA 合成到白底 → RGB → 图片字节。原图为 JPG/JPEG 时编码为 JPEG，其他格式编码为 PNG。</p>
+              <p class="detail"><code>encode_image</code> 调用模型的 image processor，按图像高、宽计算 patch 数。</p>
+              <p class="equation">expected_tokens = patches // merge_size²</p>
+            </div>
+          </div>
+          <div class="lane">
+            <div class="lane-label">after_image</div>
+            <div class="lane-body"><h3>编码后段文本</h3><p>保留占位符之后的模板文本，其中包含引导 assistant 开始回答的生成提示。</p><p class="detail"><code>tokenizer.encode(…, add_special_tokens=False)</code></p></div>
+          </div>
+        </div>
+        <div class="feeds" aria-hidden="true"><i class="feed"></i><i class="feed image-feed"></i><i class="feed"></i></div>
+        <div class="chunks" aria-label="按顺序组成 ModelInput 的三个块">
+          <div class="chunk"><strong>EncodedTextChunk</strong><span>前段文本 token</span></div>
+          <div class="chunk pixel-chunk"><strong>ImageChunk</strong><span><code>data · format · expected_tokens</code></span></div>
+          <div class="chunk"><strong>EncodedTextChunk</strong><span>后段文本 token</span></div>
+        </div>
+        <div class="bracket" id="prompt-bracket" aria-hidden="true"></div>
+        <p class="prompt-length"><b><code>ModelInput(chunks=prompt_chunks)</code></b> 长度 P = 前段 token 数 + 预期视觉 token 数 + 后段 token 数</p>
+      </div>
+    </section>
+    <div class="drop" aria-hidden="true"></div>
+    <section class="stage rollout">
+      <header class="stage-head"><h2>同一份图文 prompt，采样一组回答</h2><a class="source" href="../../experiments/vision-grpo/train.py">train.py 197–250, 366–411</a></header>
+      <div class="roll-grid">
+        <div class="sample-notes">
+          <div><h3>批内各题并发，每题一次请求</h3><p><code>sample_async(num_samples=G)</code> 生成 G 条回答。每条保留生成 token 及其采样时的 logprob。</p></div>
+          <p class="check">校验 <code>response.input_tokens == P</code>，并逐条核对回答的 token 数与 logprob 数。长度不符时抛错。</p>
+          <p><b>组内优势</b>　<code>Aᵢ = rᵢ − mean(r)</code>。本题示例中，4 条回答有 2 条得分，平均奖励为 0.5。</p>
+        </div>
+        <table class="scores" id="grade">
+          <caption>示例评分 · 提取最后一个有效的 boxed 选项，与标准 C 比较</caption>
+          <thead><tr><th scope="col">回答末尾（示例）</th><th scope="col">提取</th><th scope="col">奖励 rᵢ</th><th scope="col">优势 Aᵢ</th></tr></thead>
+          <tbody>
+            <tr><td><code>… &#92;boxed{C}</code></td><td>C</td><td>1</td><td class="value">+0.5</td></tr>
+            <tr><td><code>… &#92;boxed{B} … &#92;boxed{C}</code></td><td>C</td><td>1</td><td class="value">+0.5</td></tr>
+            <tr><td><code>… &#92;boxed{B}</code></td><td>B</td><td>0</td><td class="value negative">−0.5</td></tr>
+            <tr><td>… 所以是 70°。</td><td>无</td><td>0</td><td class="value negative">−0.5</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="gate"><b>组内有分差</b> → 每条非空回答生成一个 Datum。　<b>整组同分</b> → 所有优势为 0，跳过该题。</p>
+    </section>
+    <div class="drop" aria-hidden="true"></div>
+    <section class="stage datum">
+      <header class="stage-head"><h2>复用图文上下文，对齐每个回答 token</h2><a class="source" href="../../experiments/vision-grpo/train.py">build_grpo_datum · 253–278</a></header>
+      <p>取示例第一条回答，设生成序列为 y₁ … y<sub>T</sub>。模型输入保留完整的三个 prompt chunks，末尾追加 <code>sample.tokens[:-1]</code>。</p>
+      <div class="scroll-hint">左右滑动可查看全部预测位置。</div>
+      <div class="scroll" role="region" aria-label="训练输入与目标按预测位置对齐" tabindex="0">
+        <table class="align">
+          <thead><tr><th scope="col">预测位置</th><th scope="col" class="context-pos">前 P−1 位</th><th scope="col" class="first">第 P 位</th><th scope="col" class="answer-pos">第 P+1 位</th><th scope="col" class="answer-pos">…</th><th scope="col" class="answer-pos">第 P+T−1 位</th></tr></thead>
+          <tbody>
+            <tr><th scope="row" id="datum-input">model_input</th><td class="context-pos">图文上下文前 P−1 位</td><td class="first">最后一个 prompt token</td><td class="answer-pos">y₁</td><td class="answer-pos">…</td><td class="answer-pos">y<sub>T−1</sub></td></tr>
+            <tr><th scope="row">target_tokens</th><td class="context-pos">0 … 0</td><td class="first"><b>y₁</b></td><td class="answer-pos">y₂</td><td class="answer-pos">…</td><td class="answer-pos">y<sub>T</sub></td></tr>
+            <tr><th scope="row">logprobs</th><td class="context-pos">0 … 0</td><td class="first">log p<sub>old</sub>(y₁)</td><td class="answer-pos">log p<sub>old</sub>(y₂)</td><td class="answer-pos">…</td><td class="answer-pos">log p<sub>old</sub>(y<sub>T</sub>)</td></tr>
+            <tr><th scope="row">advantages</th><td class="context-pos">0 … 0</td><td class="first">+0.5</td><td class="answer-pos">+0.5</td><td class="answer-pos">…</td><td class="answer-pos">+0.5</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="caption"><b>最后一个 prompt token 预测 y₁。</b> 因此三组训练数组各以 P−1 个零开头，后接 T 个回答位置。图片随上下文参与预测，优势逐个赋给生成 token。</div>
+    </section>
+    <div class="drop" aria-hidden="true"></div>
+    <section class="update" id="update">
+      <header class="stage-head"><h2>汇总本批 Datum，更新一次 LoRA</h2><a class="source" href="../../experiments/vision-grpo/train.py">train.py 420–446</a></header>
+      <p>有有效样本 → <code>forward_backward_async(loss_fn="importance_sampling")</code> → <code>optim_step_async(Adam)</code> → <a class="jump" href="#sampler">下一步刷新采样器</a>。</p>
+      <p>本批没有有效 Datum 时跳过参数更新。两种情况均向 SwanLab 记录奖励、格式率、退化组占比、Datum 数和平均生成长度。</p>
+    </section>
+  </div>
+  <footer class="outputs">
+    <section><h3>保存权重与状态</h3><a class="source" href="../../experiments/vision-grpo/train.py">train.py 306–322, 457–467</a><p>启用保存时，按间隔存档并补存最终步。<code>sampler_weights</code> 用于推理，<code>training_state</code> 用于恢复训练。</p></section>
+    <section><h3>用相同输入评测</h3><a class="source" href="../../experiments/vision-grpo/eval.py">eval.py 75–145</a><p>Base 或采样权重 → 固定的 GeoQA 测试子集（默认 100 题）→ 复用 <code>build_prompt_chunks</code> → 每题采样一次（温度 0），统计准确率与格式率。</p></section>
+  </footer>
+</main>
+<script>
+  // Route the long connections in the margins so they never cover diagram text.
+  const flow = document.getElementById("flow");
+  function connect(id, from, to, side, railOffset, targetInset) {
+    const frame = flow.getBoundingClientRect();
+    const source = document.getElementById(from).getBoundingClientRect();
+    const target = document.getElementById(to).getBoundingClientRect();
+    const left = side === "left";
+    const edge = left ? 0 : frame.width;
+    const rail = edge + (left ? -railOffset : railOffset);
+    const startY = source.top - frame.top + Math.min(26, source.height / 2);
+    const endY = target.top - frame.top + Math.min(17, target.height / 2);
+    const startX = (left ? source.left : source.right) - frame.left;
+    const endX = (left ? target.left : target.right) - frame.left + targetInset;
+    document.getElementById(id).setAttribute("d",
+      `M ${startX} ${startY} H ${rail} V ${endY} H ${endX}`);
+  }
+  function drawConnections() {
+    connect("return-wire", "update", "sampler", "left", 18, -3);
+    connect("gold-wire", "gold", "grade", "right", 16, 2);
+    connect("reuse-wire", "prompt-bracket", "datum-input", "left", 8, -2);
+  }
+  new ResizeObserver(drawConnections).observe(flow);
+  document.fonts.ready.then(drawConnections);
+</script>
+</body>
+</html>
