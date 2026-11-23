@@ -20,6 +20,7 @@ import asyncio
 import io
 import re
 import time
+from collections import deque
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
@@ -30,6 +31,7 @@ import pytrio as trio
 import swanlab
 from datasets import Dataset, load_dataset
 from PIL import Image
+from pytrio.errors.event import EventFailedError
 from tqdm.asyncio import tqdm_asyncio
 from transformers import AutoImageProcessor
 
@@ -38,6 +40,8 @@ DEFAULT_DATASET_DIR = SCRIPT_DIR / "datasets"
 DEFAULT_MODEL = "Qwen/Qwen3.5-4B"
 IMAGE_PAD_TOKEN = "<|image_pad|>"
 CHOICE_LETTERS = "ABCD"
+MAX_MICRO_BATCH_ITEMS = 32
+MAX_MICRO_BATCH_PADDED_TOKENS = 64_000
 BOXED_CHOICE_PATTERN = re.compile(r"\\boxed\s*\{\s*([A-D])\s*\}", re.IGNORECASE)
 
 
@@ -66,6 +70,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--group-size", type=int, default=4)
+    parser.add_argument(
+        "--micro-batch-size",
+        type=int,
+        default=16,
+        help=f"单次反向请求的 Datum 数上限（1–{MAX_MICRO_BATCH_ITEMS}，默认 16）",
+    )
+    parser.add_argument(
+        "--micro-batch-max-images",
+        type=int,
+        default=4,
+        help="单次反向请求的图片数预算（默认 4，重复图片按出现次数计）",
+    )
     parser.add_argument(
         "--max-samples", type=int, default=0, help="0 表示使用全部训练集"
     )
@@ -100,7 +116,12 @@ def parse_args() -> argparse.Namespace:
         default=True,
     )
     parser.add_argument("--show-samples", action="store_true")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not 1 <= args.micro_batch_size <= MAX_MICRO_BATCH_ITEMS:
+        parser.error(f"--micro-batch-size 必须在 1 到 {MAX_MICRO_BATCH_ITEMS} 之间")
+    if args.micro_batch_max_images < 1:
+        parser.error("--micro-batch-max-images 必须大于 0")
+    return args
 
 
 def load_geoqa_train(dataset_dir: Path, seed: int, max_samples: int) -> Dataset:
@@ -278,6 +299,94 @@ def build_grpo_datum(group: RolloutGroup, sample: RolloutSample) -> trio.Datum:
     )
 
 
+def pack_micro_batches(
+    datums: list[trio.Datum], max_items: int, max_images: int
+) -> list[list[trio.Datum]]:
+    """按 Datum 数、图片数和 padding 后的 token 数分批。"""
+    batches: list[list[trio.Datum]] = []
+    batch_max_tokens = 0
+    batch_images = 0
+    for datum in sorted(datums, key=lambda item: len(item.model_input), reverse=True):
+        num_tokens = len(datum.model_input)
+        num_images = sum(
+            isinstance(chunk, trio.types.ImageChunk) for chunk in datum.model_input.chunks
+        )
+        if (
+            not batches
+            or len(batches[-1]) == max_items
+            or batch_images + num_images > max_images
+            or (len(batches[-1]) + 1) * batch_max_tokens > MAX_MICRO_BATCH_PADDED_TOKENS
+        ):
+            batches.append([])
+            batch_max_tokens = num_tokens
+            batch_images = 0
+        batches[-1].append(datum)
+        batch_images += num_images
+    return batches
+
+
+async def train_micro_batches(
+    training_client: trio.TrainingClient,
+    micro_batches: list[list[trio.Datum]],
+    adam_params: trio.AdamParams,
+) -> tuple[dict[str, float], int]:
+    """累积一个逻辑 batch 的梯度，再更新一次参数。"""
+    total_datums = sum(map(len, micro_batches))
+    if not total_datums:
+        return {}, 0
+
+    trainer_metrics: dict[str, float] = {}
+    pending = deque(micro_batches)
+    completed = 0
+    while pending:
+        batch = pending.popleft()
+        # PyTRIO 按请求内样本数取均值，乘以样本占比可恢复整步的样本均值。
+        weight = len(batch) / total_datums
+        weighted_batch = batch
+        if weight != 1:
+            weighted_batch = [
+                trio.Datum(
+                    model_input=datum.model_input,
+                    loss_fn_inputs={
+                        **datum.loss_fn_inputs,
+                        "advantages": datum.loss_fn_inputs["advantages"].to_numpy()
+                        * np.float32(weight),
+                    },
+                )
+                for datum in batch
+            ]
+        try:
+            future = await training_client.forward_backward_async(
+                weighted_batch, loss_fn="importance_sampling"
+            )
+            result = await future
+        except EventFailedError as error:
+            # 只有全部已报告 rank 都在输入校验阶段拒绝时才拆分重试。
+            reasons = error.event_message.split("; ")
+            if len(batch) < 2 or not all(
+                re.fullmatch(r"(?:rank \d+: )?InputRejected: batch exceeds image count limit", reason)
+                for reason in reasons
+            ):
+                raise
+            middle = len(batch) // 2
+            pending.appendleft(batch[middle:])
+            pending.appendleft(batch[:middle])
+            tqdm_asyncio.write(f"PyTRIO 图片数超限，将 {len(batch)} 条 Datum 拆小后重试。")
+            continue
+        completed += 1
+        for key, value in result.metrics.items():
+            metric = float(value)
+            if key in {"loss_sum", "loss/sum"}:
+                metric /= weight
+            elif key not in {"loss_mean", "loss/mean", "token_count"}:
+                metric *= weight
+            trainer_metrics[key] = trainer_metrics.get(key, 0.0) + metric
+
+    optim_step = await training_client.optim_step_async(adam_params)
+    await optim_step
+    return trainer_metrics, completed
+
+
 def init_swanlab(args: argparse.Namespace, dataset_size: int) -> Any:
     """初始化训练日志。"""
     return swanlab.init(
@@ -295,6 +404,8 @@ def init_swanlab(args: argparse.Namespace, dataset_size: int) -> Any:
             "steps": args.steps,
             "batch_size": args.batch_size,
             "group_size": args.group_size,
+            "micro_batch_size": args.micro_batch_size,
+            "micro_batch_max_images": args.micro_batch_max_images,
             "max_tokens": args.max_tokens,
             "temperature": args.temperature,
             "learning_rate": args.learning_rate,
@@ -417,18 +528,12 @@ async def main(args: argparse.Namespace) -> None:
                 f"本 batch 平均输出长度：{mean_output_tokens:.1f} tokens"
             )
 
-            trainer_metrics: dict[str, float] = {}
-            if datums:
-                forward_backward = await training_client.forward_backward_async(
-                    datums,
-                    loss_fn="importance_sampling",
-                )
-                optim_step = await training_client.optim_step_async(adam_params)
-                result = await forward_backward
-                await optim_step
-                trainer_metrics = {
-                    key: float(value) for key, value in result.metrics.items()
-                }
+            micro_batches = pack_micro_batches(
+                datums, args.micro_batch_size, args.micro_batch_max_images
+            )
+            trainer_metrics, completed_batches = await train_micro_batches(
+                training_client, micro_batches, adam_params
+            )
 
             mean_reward = sum(prompt_rewards) / len(prompt_rewards)
             format_rate = sum(
@@ -440,6 +545,7 @@ async def main(args: argparse.Namespace) -> None:
                 "format_rate": format_rate,
                 "degenerate_fraction": degenerate_fraction,
                 "train_datums": len(datums),
+                "train_micro_batches": completed_batches,
                 "rollout/completion_tokens_mean": mean_output_tokens,
                 **{f"trainer/{key}": value for key, value in trainer_metrics.items()},
             }
@@ -450,7 +556,8 @@ async def main(args: argparse.Namespace) -> None:
             print(
                 f"Step {step + 1}/{args.steps} | reward={mean_reward:.3f} | "
                 f"format={format_rate:.1%} | degenerate={degenerate_fraction:.1%} | "
-                f"datums={len(datums)} | loss_mean={loss_text}",
+                f"datums={len(datums)} | micro_batches={completed_batches} | "
+                f"loss_mean={loss_text}",
                 flush=True,
             )
 
