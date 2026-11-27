@@ -1,5 +1,7 @@
 ### task03 vision grpo
 
+> 本文为 [DataWhale](https://github.com/datawhalechina) 开源项目 [agentic-rl-lab](https://github.com/datawhalechina/agentic-rl-lab) 的学习笔记与实验记录，感谢 DataWhale 与 PyTRIO 的支持。
+
 #### 一、代码解读
 
 ![Vision GRPO 训练架构](figures/vision-grpo-architecture.png)

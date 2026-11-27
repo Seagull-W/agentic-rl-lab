@@ -1,4 +1,7 @@
 ### Task00-GettingStarted
+
+> 本文为 [DataWhale](https://github.com/datawhalechina) 开源项目 [agentic-rl-lab](https://github.com/datawhalechina/agentic-rl-lab) 的学习笔记与实验记录，感谢 DataWhale 与 PyTRIO 的支持。
+
 **DataWhale** Agentic RL项目，主要内容是复现一系列RL算法（主要是GRPO与在线策略蒸馏）。
 
 特点是采用Pytrio进行远程训练，从而避免对配置的需求，也能专注算法本身，用Swanlab进行训练监控。

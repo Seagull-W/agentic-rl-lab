@@ -1,5 +1,7 @@
 ### task02 grpo demo
 
+> 本文为 [DataWhale](https://github.com/datawhalechina) 开源项目 [agentic-rl-lab](https://github.com/datawhalechina/agentic-rl-lab) 的学习笔记与实验记录，感谢 DataWhale 与 PyTRIO 的支持。
+
 #### 零、前言
 关于GRPO的内容，可以参考我的个人网页，包括[强化学习笔记](http://127.0.0.1:5173/rl-book/cha6%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0#grpo-group-relative-policy-optimization)、[deepseek-r1论文解读](http://127.0.0.1:5173/papers/deepseek-r1/)
 

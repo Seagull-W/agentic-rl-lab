@@ -1,5 +1,7 @@
 ### task04 general opd
 
+> 本文为 [DataWhale](https://github.com/datawhalechina) 开源项目 [agentic-rl-lab](https://github.com/datawhalechina/agentic-rl-lab) 的学习笔记与实验记录，感谢 DataWhale 与 PyTRIO 的支持。
+
 #### 一、OPD 原理
 
 ##### 1.1 核心思想与训练闭环
