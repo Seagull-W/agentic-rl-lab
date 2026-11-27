@@ -11,17 +11,17 @@
   },
   "completed": true,
   "seconds": 23.120336252000016,
-  "format_rate": 0.9,
-  "tool_name_acc": 0.85,
-  "exact_ast_match": 0.75,
+  "format_rate": 0.9166666666666666,
+  "tool_name_acc": 0.8666666666666667,
+  "exact_ast_match": 0.8,
   "n": 60,
   "avg_completion_tokens": 22.083333333333332,
   "truncation_rate": 0,
   "error_counts": {
+    "format_error": 5,
     "wrong_tool": 3,
-    "wrong_args_value": 4,
-    "format_error": 6,
-    "wrong_args_key": 2
+    "wrong_args_key": 2,
+    "wrong_args_value": 2
   },
   "prompt_tokens_total": 32081,
   "completion_tokens_total": 1325

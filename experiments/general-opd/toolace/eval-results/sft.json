@@ -11,7 +11,7 @@
   },
   "completed": true,
   "seconds": 18.760377802999756,
-  "format_rate": 1,
+  "format_rate": 1.0,
   "tool_name_acc": 0.9833333333333333,
   "exact_ast_match": 0.8666666666666667,
   "n": 60,
