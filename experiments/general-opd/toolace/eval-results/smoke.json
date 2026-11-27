@@ -1,0 +1,26 @@
+{
+  "config": {
+    "task": "toolace",
+    "base_model": "Qwen/Qwen3.5-4B",
+    "model_path": "trio://run_74ikgl3nania/sampler_weights/toolace-smoke-sft-step1",
+    "seed": 42,
+    "temperature": 0.0,
+    "max_tokens": 256,
+    "data_hash": "8e588a060dfcaf152e9934ee1a2457138b98bf0d09aaf54a0855075a5d1b5d39",
+    "enable_thinking": false
+  },
+  "completed": true,
+  "seconds": 14.03558202000022,
+  "format_rate": 0.8,
+  "tool_name_acc": 0.8,
+  "exact_ast_match": 0.6,
+  "n": 5,
+  "avg_completion_tokens": 27.8,
+  "truncation_rate": 0,
+  "error_counts": {
+    "wrong_args_value": 1,
+    "format_error": 1
+  },
+  "prompt_tokens_total": 3116,
+  "completion_tokens_total": 139
+}

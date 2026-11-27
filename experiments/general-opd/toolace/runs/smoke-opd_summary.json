@@ -1,0 +1,49 @@
+{
+  "method": "opd",
+  "config": {
+    "base_model": "Qwen/Qwen3.5-4B",
+    "steps": 1,
+    "batch_size": 2,
+    "learning_rate": 4e-05,
+    "lora_rank": 32,
+    "swanlab_project": "agentic-rl-lab-opd",
+    "swanlab_mode": "disabled",
+    "name": "smoke-opd",
+    "teacher_base_model": "Qwen/Qwen3.8-27B",
+    "group_size": 1,
+    "max_tokens": 256,
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "top_k": -1,
+    "kl_penalty_coef": 1.0,
+    "concurrency": 8,
+    "sampler_refresh_steps": 1
+  },
+  "swanlab_url": null,
+  "history": [
+    {
+      "reverse_kl_mean": 0.005046468786259832,
+      "reverse_kl_std": 0.020982522785734575,
+      "truncation_rate": 0.0,
+      "completion_tokens_mean": 26.0,
+      "trainer/loss_sum": 0.2624572142958641,
+      "trainer/loss_mean": 0.00024995925171034675,
+      "trainer/token_count": 1050.0,
+      "step": 1,
+      "step_seconds": 27.24721885000008,
+      "prompt_tokens_total": 1000,
+      "completion_tokens_total": 52,
+      "teacher_input_tokens": 1052,
+      "training_input_tokens": 1050,
+      "tokens_per_second": 1.9084516583607154
+    }
+  ],
+  "weights_path": "trio://run_v6xtak183jwo/sampler_weights/toolace-smoke-opd-step1",
+  "token_totals": {
+    "prompt_tokens_total": 1000,
+    "completion_tokens_total": 52,
+    "teacher_input_tokens": 1052,
+    "training_input_tokens": 1050
+  },
+  "elapsed_seconds": 46.28414159899967
+}

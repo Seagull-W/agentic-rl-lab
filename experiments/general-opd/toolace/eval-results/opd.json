@@ -1,0 +1,28 @@
+{
+  "config": {
+    "task": "toolace",
+    "base_model": "Qwen/Qwen3.5-4B",
+    "model_path": "trio://run_1p6ij55dcxu9/sampler_weights/toolace-opd-step25",
+    "seed": 42,
+    "temperature": 0.0,
+    "max_tokens": 256,
+    "data_hash": "267fc00129fccfe38a7f8acbbb229d797ed81514b57dd27372dec1d67d077cde",
+    "enable_thinking": false
+  },
+  "completed": true,
+  "seconds": 23.120336252000016,
+  "format_rate": 0.9,
+  "tool_name_acc": 0.85,
+  "exact_ast_match": 0.75,
+  "n": 60,
+  "avg_completion_tokens": 22.083333333333332,
+  "truncation_rate": 0,
+  "error_counts": {
+    "wrong_tool": 3,
+    "wrong_args_value": 4,
+    "format_error": 6,
+    "wrong_args_key": 2
+  },
+  "prompt_tokens_total": 32081,
+  "completion_tokens_total": 1325
+}

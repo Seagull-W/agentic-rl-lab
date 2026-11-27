@@ -1,0 +1,28 @@
+{
+  "config": {
+    "task": "toolace",
+    "base_model": "Qwen/Qwen3.8-27B",
+    "model_path": null,
+    "seed": 42,
+    "temperature": 0.0,
+    "max_tokens": 256,
+    "data_hash": "267fc00129fccfe38a7f8acbbb229d797ed81514b57dd27372dec1d67d077cde",
+    "enable_thinking": false
+  },
+  "completed": true,
+  "seconds": 24.629835275000005,
+  "format_rate": 0.7333333333333333,
+  "tool_name_acc": 0.7166666666666667,
+  "exact_ast_match": 0.6,
+  "n": 60,
+  "avg_completion_tokens": 23.233333333333334,
+  "truncation_rate": 0,
+  "error_counts": {
+    "format_error": 16,
+    "wrong_args_value": 3,
+    "wrong_args_key": 4,
+    "wrong_tool": 1
+  },
+  "prompt_tokens_total": 32081,
+  "completion_tokens_total": 1394
+}

@@ -267,3 +267,8 @@ experiments/general-opd/datasets/
 
 # Local workspace artifacts
 /.workspace/
+
+# Task05 reproducible local splits and transient write buffers
+experiments/general-opd/toolace/datasets/
+experiments/general-opd/toolace/runs/*.tmp
+experiments/general-opd/toolace/eval-results/*.tmp

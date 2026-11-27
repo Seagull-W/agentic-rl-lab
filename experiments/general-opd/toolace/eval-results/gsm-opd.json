@@ -1,0 +1,24 @@
+{
+  "config": {
+    "task": "gsm8k",
+    "base_model": "Qwen/Qwen3.5-4B",
+    "model_path": "trio://run_1p6ij55dcxu9/sampler_weights/toolace-opd-step25",
+    "seed": 42,
+    "temperature": 0.0,
+    "max_tokens": 384,
+    "data_hash": "381e75776c883f5fec823883faa974d1e0d8da7525acc44649091526ce725760",
+    "enable_thinking": false
+  },
+  "completed": true,
+  "seconds": 28.24199265599964,
+  "correct": 0.8666666666666667,
+  "n": 30,
+  "avg_completion_tokens": 250.86666666666667,
+  "truncation_rate": 0.06666666666666667,
+  "error_counts": {
+    "incorrect": 2,
+    "truncated": 2
+  },
+  "prompt_tokens_total": 2682,
+  "completion_tokens_total": 7526
+}

@@ -1,0 +1,27 @@
+{
+  "config": {
+    "task": "toolace",
+    "base_model": "Qwen/Qwen3.5-4B",
+    "model_path": "trio://run_ibas1nlgbbu3/sampler_weights/toolace-sft-step25",
+    "seed": 42,
+    "temperature": 0.0,
+    "max_tokens": 256,
+    "data_hash": "267fc00129fccfe38a7f8acbbb229d797ed81514b57dd27372dec1d67d077cde",
+    "enable_thinking": false
+  },
+  "completed": true,
+  "seconds": 18.760377802999756,
+  "format_rate": 1,
+  "tool_name_acc": 0.9833333333333333,
+  "exact_ast_match": 0.8666666666666667,
+  "n": 60,
+  "avg_completion_tokens": 20.4,
+  "truncation_rate": 0,
+  "error_counts": {
+    "wrong_tool": 1,
+    "wrong_args_key": 2,
+    "wrong_args_value": 5
+  },
+  "prompt_tokens_total": 32081,
+  "completion_tokens_total": 1224
+}

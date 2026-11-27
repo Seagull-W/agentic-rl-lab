@@ -1,0 +1,32 @@
+{
+  "method": "sft",
+  "config": {
+    "base_model": "Qwen/Qwen3.5-4B",
+    "steps": 1,
+    "batch_size": 2,
+    "learning_rate": 4e-05,
+    "lora_rank": 32,
+    "swanlab_project": "agentic-rl-lab-opd",
+    "swanlab_mode": "disabled",
+    "name": "smoke-sft",
+    "max_length": 1024
+  },
+  "swanlab_url": null,
+  "history": [
+    {
+      "supervised_tokens": 52,
+      "trainer/loss_sum": 0.08249282836914062,
+      "trainer/loss_mean": 0.0015864005455603967,
+      "trainer/token_count": 52.0,
+      "loss": 0.0015864005455603967,
+      "step": 1,
+      "step_seconds": 8.747919352999816,
+      "training_input_tokens": 1050
+    }
+  ],
+  "weights_path": "trio://run_74ikgl3nania/sampler_weights/toolace-smoke-sft-step1",
+  "token_totals": {
+    "training_input_tokens": 1050
+  },
+  "elapsed_seconds": 22.138261536999835
+}
