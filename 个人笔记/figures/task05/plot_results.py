@@ -83,30 +83,28 @@ def training():
 def evaluation():
     models = ["base", "sft", "opd", "teacher"]
     tool = [load(f"eval-results/{m}.json") for m in models]
-    gsm = [load(f"eval-results/gsm-{m}.json") for m in models[:3]]
-    for series, n in ((tool, 60), (gsm, 30)):
-        if any(not r["completed"] or r["n"] != n for r in series):
-            raise ValueError("evaluation incomplete")
-        if (
-            len(
-                {
-                    (
-                        r["config"]["data_hash"],
-                        r["config"]["temperature"],
-                        r["config"]["max_tokens"],
-                    )
-                    for r in series
-                }
-            )
-            != 1
-        ):
-            raise ValueError("inconsistent evaluation settings")
-    fig, (ax, err, math) = plt.subplots(
+    if any(not r["completed"] or r["n"] != 60 for r in tool):
+        raise ValueError("evaluation incomplete")
+    if (
+        len(
+            {
+                (
+                    r["config"]["data_hash"],
+                    r["config"]["temperature"],
+                    r["config"]["max_tokens"],
+                )
+                for r in tool
+            }
+        )
+        != 1
+    ):
+        raise ValueError("inconsistent evaluation settings")
+    fig, (ax, err) = plt.subplots(
         1,
-        3,
-        figsize=(13, 4.4),
+        2,
+        figsize=(10.5, 4.4),
         layout="constrained",
-        gridspec_kw={"width_ratios": [1.35, 1.22, 0.85]},
+        gridspec_kw={"width_ratios": [1.15, 1.0]},
     )
     keys = ["format_rate", "tool_name_acc", "exact_ast_match"]
     pos = np.arange(len(keys))
@@ -121,7 +119,7 @@ def evaluation():
         ax.bar_label(
             bars, labels=[str(round(r[k] * 60)) for k in keys], fontsize=7.5, padding=1
         )
-    ax.set_xticks(pos, ["Format", "Tool name", "Exact AST"])
+    ax.set_xticks(pos, ["Format", "Tool name", "Exact match"])
     ax.set(
         title="ToolACE  ·  60 prompts", ylabel="Share of all prompts", ylim=(0, 1.12)
     )
@@ -154,13 +152,6 @@ def evaluation():
         fontsize=8,
     )
     err.xaxis.set_major_locator(MaxNLocator(integer=True))
-    bars = math.bar(range(3), [r["correct"] for r in gsm], color=COLORS[:3], width=0.65)
-    math.bar_label(
-        bars, labels=[f"{round(r['correct'] * 30)}/30" for r in gsm], padding=2
-    )
-    math.set_xticks(range(3), ["Base", "SFT", "OPD"])
-    math.set(title="GSM8K-mini  ·  30 prompts", ylabel="Accuracy", ylim=(0, 1.12))
-    math.yaxis.set_major_formatter(PercentFormatter(1))
     fig.savefig(OUT / "evaluation.png", dpi=165)
     plt.close(fig)
 
